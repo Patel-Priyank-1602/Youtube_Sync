@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Sync Controller</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .main-container {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .left-panel {
+      background: #0a0a0a;
+      border: 1px solid #222;
+      border-radius: 16px;
+      padding: 24px;
+      height: fit-content;
+      position: sticky;
+      top: 20px;
+    }
+
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .qr-section {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .qr-section h2 {
+      font-size: 1.2rem;
+      margin-bottom: 12px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .qr-code {
+      background: #fff;
+      padding: 16px;
+      border-radius: 12px;
+      display: inline-block;
+      margin-bottom: 12px;
+    }
+
+    .qr-code img {
+      display: block;
+      width: 200px;
+      height: 200px;
+    }
+
+    .wifi-info {
+      background: #111;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-top: 12px;
+      border: 1px solid #222;
+    }
+
+    .wifi-info p {
+      margin: 4px 0;
+      color: #aaa;
+    }
+
+    .wifi-info strong {
+      color: #fff;
+    }
+
+    .divider {
+      height: 1px;
+      background: #222;
+      margin: 24px 0;
+    }
+
+    .connection-qr {
+      margin-top: 20px;
+    }
+
+    .connection-qr h3 {
+      font-size: 1rem;
+      margin-bottom: 12px;
+      color: #ccc;
+    }
+
+    .qr-small {
+      background: #fff;
+      padding: 12px;
+      border-radius: 8px;
+      display: inline-block;
+    }
+
+    .qr-small img {
+      width: 140px;
+      height: 140px;
+      display: block;
+    }
+
+    header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    header p {
+      color: #888;
+      font-size: 1.1rem;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: #0a0a0a;
+      border: 1px solid #222;
+      border-radius: 16px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    input {
+      flex: 1;
+      padding: 14px 18px;
+      font-size: 1rem;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 10px;
+      color: #fff;
+      transition: all 0.3s;
+    }
+
+    input::placeholder {
+      color: #555;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #fff;
+      background: #1a1a1a;
+    }
+
+    button {
+      padding: 14px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: #e0e0e0;
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: #fff;
+      border: 1px solid #333;
+    }
+
+    .btn-secondary:hover {
+      background: #1a1a1a;
+      border-color: #fff;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin: 24px 0;
+    }
+
+    .seek-group {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    #seekTime {
+      width: 140px;
+    }
+
+    .status {
+      display: flex;
+      justify-content: space-between;
+      padding: 16px;
+      background: #111;
+      border-radius: 10px;
+      border: 1px solid #222;
+      margin: 20px 0;
+    }
+
+    .status-item {
+      text-align: center;
+    }
+
+    .status-label {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .status-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    #log {
+      background: #000;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 20px;
+      flex-grow: 1;
+      min-height: 200px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #aaa;
+      line-height: 1.6;
+    }
+
+    #log::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    #log::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #log::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 4px;
+    }
+
+    .log-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid #111;
+    }
+
+    .sync-all-btn {
+      background: #fff;
+      color: #000;
+      font-size: 1.1rem;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .sync-all-btn:hover {
+      background: #f0f0f0;
+    }
+
+    @media (max-width: 1024px) {
+      .main-container {
+        grid-template-columns: 1fr;
+      }
+
+      .left-panel {
+        position: relative;
+        top: 0;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 12px;
+      }
+
+      header h1 {
+        font-size: 2rem;
+      }
+
+      .controls {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .input-group {
+        flex-direction: column;
+      }
+
+      .seek-group {
+        flex-direction: column;
+      }
+
+      #seekTime {
+        width: 100%;
+      }
+
+      .card {
+        padding: 20px;
+      }
+
+      .qr-code img {
+        width: 160px;
+        height: 160px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="main-container">
+    <div class="left-panel">
+      <div class="qr-section">
+        <h2>WiFi Connection</h2>
+        <div class="qr-code">
+          <img id="wifiQR" src="" alt="WiFi QR Code">
+        </div>
+        <p style="color: #888; font-size: 0.9rem;">Scan to connect</p>
+        <div class="wifi-info">
+          <p><strong>Network:</strong> <span id="wifiSSID">Loading...</span></p>
+          <p style="font-size: 0.8rem; color: #666; margin-top: 8px;">Scan QR with camera app</p>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="connection-qr">
+        <h3>Controller Access</h3>
+        <div class="qr-small">
+          <img id="controllerQR" src="" alt="Controller QR">
+        </div>
+      </div>
+
+      <div class="connection-qr" style="margin-top: 20px;">
+        <h3>Client Access</h3>
+        <div class="qr-small">
+          <img id="clientQR" src="" alt="Client QR">
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <header>
+        <h1>YouTube Sync Controller</h1>
+        <p>Real-time synchronized playback controller</p>
+      </header>
+
+      <div class="card">
+        <div class="input-group">
+          <input id="videoInput" placeholder="Enter YouTube URL or Video ID" />
+          <button onclick="loadVideo()">Load Video</button>
+        </div>
+
+        <div class="controls">
+          <button class="btn-secondary" onclick="sendCommand('play')">▶ Play</button>
+          <button class="btn-secondary" onclick="sendCommand('pause')">⏸ Pause</button>
+          <button class="btn-secondary" onclick="sendCommand('restart')">⏮ Restart</button>
+        </div>
+
+        <div class="seek-group">
+          <input id="seekTime" type="number" placeholder="Seek (seconds)" />
+          <button class="btn-secondary" onclick="seek()">Seek to Time</button>
+        </div>
+
+        <button class="sync-all-btn" onclick="syncAll()">SYNC ALL CLIENTS</button>
+
+        <div class="status">
+          <div class="status-item">
+            <div class="status-label">Connected Clients</div>
+            <div class="status-value" id="count">0</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Controllers</div>
+            <div class="status-value" id="controllerCount">0</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Server Status</div>
+            <div class="status-value" style="color: #0f0;">●</div>
+          </div>
+        </div>
+
+        <div id="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    socket.emit("identify", { role: "controller" });
+
+    // Load QR codes
+    async function loadQRCodes() {
+      try {
+        const wifiRes = await fetch('/api/wifi-qr');
+        const wifiData = await wifiRes.json();
+        document.getElementById('wifiQR').src = wifiData.qrCode;
+        document.getElementById('wifiSSID').textContent = wifiData.ssid;
+
+        const connRes = await fetch('/api/connection-qr');
+        const connData = await connRes.json();
+        document.getElementById('controllerQR').src = connData.controllerQR;
+        document.getElementById('clientQR').src = connData.clientQR;
+
+        log("QR codes loaded successfully");
+      } catch (error) {
+        log("Error loading QR codes: " + error.message);
+        console.error("QR Error:", error);
+      }
+    }
+
+    socket.on("clients_count", (data) => {
+      document.getElementById("count").textContent = data.clients || 0;
+      document.getElementById("controllerCount").textContent = data.controllers || 0;
+    });
+
+    socket.on("connect", () => {
+      log("Connected to server");
+    });
+
+    socket.on("disconnect", () => {
+      log("Disconnected from server");
+    });
+
+    function log(msg) {
+      const logDiv = document.getElementById("log");
+      const entry = document.createElement("div");
+      entry.className = "log-entry";
+      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+      entry.textContent = `[${timestamp}] ${msg}`;
+      logDiv.prepend(entry);
+
+      if (logDiv.children.length > 50) {
+        logDiv.removeChild(logDiv.lastChild);
+      }
+    }
+
+    function getVideoId(url) {
+      const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/ ]{11})/);
+      // If no match, assume the input *is* the 11-char ID
+      return match ? match[1] : (url.trim().length === 11 ? url.trim() : null);
+    }
+
+    function loadVideo() {
+      const input = document.getElementById("videoInput").value.trim();
+      if (!input) {
+        alert("Please enter a YouTube URL or video ID.");
+        return;
+      }
+
+      const id = getVideoId(input);
+      if (!id) {
+        alert("Invalid YouTube URL or video ID.");
+        return;
+      }
+
+      socket.emit("command", { type: "load", videoId: id, time: 0 });
+      log(`Video loaded: ${id}`);
+      document.getElementById("videoInput").value = '';
+    }
+
+    function sendCommand(type) {
+      socket.emit("command", { type });
+      const labels = {
+        play: "Play command issued",
+        pause: "Pause command issued",
+        restart: "Restart command issued"
+      };
+      log(labels[type] || `Command sent: ${type}`);
+    }
+
+    function seek() {
+      const time = parseFloat(document.getElementById("seekTime").value);
+      if (isNaN(time) || time < 0) {
+        alert("Please enter a valid non-negative time in seconds.");
+        return;
+      }
+
+      socket.emit("command", { type: "seek", time });
+      log(`Seek command sent to ${time.toFixed(2)} seconds`);
+      document.getElementById("seekTime").value = '';
+    }
+
+    function syncAll() {
+      // This command is not handled by the server logic.
+      // A full sync would require the server to re-broadcast its current state.
+      // For now, this will just log.
+      socket.emit("command", { type: "sync" });
+      log("Force sync command sent (NOTE: Server does not handle 'sync' type)");
+    }
+
+    document.getElementById("videoInput").addEventListener("keypress", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        loadVideo();
+      }
+    });
+
+    document.getElementById("seekTime").addEventListener("keypress", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        seek();
+      }
+    });
+
+    // Initialize
+    loadQRCodes();
+    log("Controller initialized. Awaiting client connections.");
+  </script>
+</body>
+
+</html>

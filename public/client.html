@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YouTube Sync Client</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000000;
+      color: #ffffff;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 800px;
+    }
+
+    header h1 {
+      font-size: 2.8rem;
+      font-weight: 700;
+      letter-spacing: -1px;
+      margin-bottom: 8px;
+      color: #ffffff;
+    }
+
+    header p {
+      color: #888888;
+      font-size: 1.1rem;
+      font-weight: 500;
+    }
+
+    .card {
+      background: #0a0a0a;
+      border: 1px solid #222222;
+      border-radius: 20px;
+      padding: 32px;
+      margin-top: 32px;
+    }
+
+    #player-container {
+      position: relative;
+      width: 100%;
+      max-width: 720px;
+      margin: 28px auto 0;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #333333;
+      background: #000;
+    }
+
+    #player {
+      width: 100%;
+      height: 405px;
+      background: #000;
+    }
+
+    .status {
+      margin: 24px 0;
+      padding: 16px;
+      background: #111111;
+      border-radius: 14px;
+      border: 1px solid #222222;
+      font-weight: 600;
+      font-size: 1.1rem;
+      text-align: center;
+      color: #cccccc;
+    }
+
+    .status span {
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      font-weight: 500;
+      color: #ffffff;
+      cursor: pointer;
+      z-index: 2000;
+      transition: opacity 0.4s ease;
+      user-select: none;
+    }
+
+    #overlay:hover {
+      background: rgba(0, 0, 0, 0.98);
+    }
+
+    #overlay .instruction {
+      font-size: 1.1rem;
+      margin-top: 16px;
+      color: #999999;
+      font-weight: 400;
+    }
+
+    #overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .footer {
+      margin-top: 48px;
+      font-size: 0.9rem;
+      color: #555555;
+      font-weight: 500;
+    }
+
+    @media (max-width: 768px) {
+      header h1 { font-size: 2.2rem; }
+      #player { height: 56.25vw; }
+      .card { padding: 24px; }
+    }
+
+    @media (max-width: 480px) {
+      #player-container { border-radius: 12px; }
+      #overlay { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay">
+    <div>Click to Enable Playback</div>
+    <div class="instruction">Required for synchronized audio and controls</div>
+  </div>
+
+  <div class="container">
+    <header>
+      <h1>YouTube Sync</h1>
+      <p>Real-time synchronized playback client</p>
+    </header>
+
+    <div class="card">
+      <div class="status">
+        Connected Clients: <span id="count">0</span>
+      </div>
+
+      <div id="player-container">
+        <div id="player"></div>
+      </div>
+
+      <div class="footer">
+        YouTube Sync Client 
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    socket.emit("identify", { role: "client" });
+
+    let player;
+    let playerReady = false;
+    let autoplayEnabled = false;
+    let queuedCommands = [];
+
+    const overlay = document.getElementById("overlay");
+    overlay.addEventListener("click", () => {
+      autoplayEnabled = true;
+      overlay.classList.add("hidden");
+      setTimeout(() => { overlay.style.display = "none"; }, 400);
+
+      if (player && playerReady) {
+        player.unMute();
+        player.playVideo();
+        setTimeout(() => player.pauseVideo(), 100);
+      }
+    });
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player("player", {
+        height: "405",
+        width: "720",
+        videoId: "",
+        playerVars: {
+          autoplay: 0,
+          controls: 1,
+          rel: 0,
+          modestbranding: 1,
+          fs: 1,
+          iv_load_policy: 3
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange
+        }
+      });
+    }
+
+    function onPlayerReady(event) {
+      playerReady = true;
+      console.log("[Client] Player initialized and ready");
+      queuedCommands.forEach(cmd => handleCommand(cmd));
+      queuedCommands = [];
+    }
+
+    function onPlayerStateChange(event) {
+      // Optional: sync state back to server if needed
+    }
+
+    socket.on("clients_count", (data) => {
+      document.getElementById("count").textContent = data.clients;
+    });
+
+    socket.on("command", (data) => {
+      console.log("[Client] Command received:", data);
+      if (!playerReady) {
+        queuedCommands.push(data);
+        return;
+      }
+      handleCommand(data);
+    });
+
+    function handleCommand(data) {
+      if (!autoplayEnabled) {
+        console.warn("[Client] Autoplay not enabled. Queuing command until user interaction.");
+        queuedCommands.push(data);
+        return;
+      }
+
+      try {
+        switch (data.type) {
+          case "load":
+            player.loadVideoById({ videoId: data.videoId, startSeconds: data.time || 0 });
+            break;
+          case "play":
+            player.playVideo();
+            break;
+          case "pause":
+            player.pauseVideo();
+            break;
+          case "seek":
+            player.seekTo(data.time || 0, true);
+            break;
+          case "restart":
+            player.seekTo(0, true);
+            player.playVideo();
+            break;
+          case "sync":
+            const current = player.getCurrentTime();
+            player.seekTo(current, true);
+            break;
+        }
+      } catch (err) {
+        console.error("[Client] Error executing command:", err);
+      }
+    }
+
+    setInterval(() => {
+      if (!autoplayEnabled && playerReady && queuedCommands.length > 0) {
+        overlay.style.display = "flex";
+        overlay.classList.remove("hidden");
+      }
+    }, 3000);
+
+    console.log("[Client] YouTube Sync Client initialized");
+  </script>
+</body>
+</html>
