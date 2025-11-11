@@ -73,7 +73,7 @@ function printBanner(ip, port) {
   console.clear();
   console.log("\n");
   console.log("═".repeat(66));
-  console.log("   YOUTUBE SYNC SERVER - PROFESSIONAL v2.5");
+  console.log("   YOUTUBE SYNC SERVER");
   console.log("═".repeat(66));
   console.log(`   Status:       Running`);
   console.log(`   Local Time:   ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`);
