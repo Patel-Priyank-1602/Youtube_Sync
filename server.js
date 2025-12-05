@@ -3,10 +3,9 @@ import http from "http";
 import { Server } from "socket.io";
 import os from "os";
 import qrcode from "qrcode";
-import fs from "fs"; // Added fs
+import fs from "fs";
 
 // --- LOAD CONFIG ---
-// Reads settings from config.json
 let config;
 try {
   const configData = fs.readFileSync("config.json", "utf8");
@@ -17,7 +16,7 @@ try {
 }
 // --- END LOAD CONFIG ---
 
-// Helper: Get local IPv4 address (non-internal)
+// Helper: Get local IPv4 address (Auto-detect fallback)
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
@@ -29,6 +28,11 @@ function getLocalIP() {
   }
   return "127.0.0.1";
 }
+
+// --- DETERMINE SERVER IP (PRIORITIZE CONFIG) ---
+// If config.HOTSPOT_IP exists, use it. Otherwise, auto-detect.
+const SERVER_IP = config.HOTSPOT_IP || getLocalIP();
+const PORT = process.env.PORT || 8000;
 
 // Initialize Express + HTTP + Socket.IO
 const app = express();
@@ -50,7 +54,7 @@ app.use(express.json());
 const clients = new Map();
 const controllers = new Map();
 
-// --- WiFi Configuration (NOW FROM config.json) ---
+// --- WiFi Configuration ---
 const WIFI_CONFIG = {
   ssid: process.env.WIFI_SSID || config.WIFI_SSID,
   password: process.env.WIFI_PASSWORD || config.WIFI_PASSWORD,
@@ -60,7 +64,7 @@ const WIFI_CONFIG = {
 // Unified Media State (YouTube Only)
 let currentMediaState = {
   mediaType: "youtube",
-  videoId: null,   // YouTube ID
+  videoId: null,
   time: 0,
   isPlaying: false,
   volume: 100,
@@ -77,7 +81,7 @@ function printBanner(ip, port) {
   console.log("═".repeat(66));
   console.log(`   Status:       Running`);
   console.log(`   Local Time:   ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`);
-  console.log(`   Server IP:     ${ip}`);
+  console.log(`   Server IP:    ${ip} (Manual: ${!!config.HOTSPOT_IP})`);
   console.log(`   Port:         ${port}`);
   console.log("");
   console.log(`   WiFi Network: ${WIFI_CONFIG.ssid}`);
@@ -120,8 +124,9 @@ app.get("/api/wifi-qr", async (req, res) => {
 
 app.get("/api/connection-qr", async (req, res) => {
   try {
-    const ip = getLocalIP();
-    const port = process.env.PORT || 8000;
+    // UPDATED: Use SERVER_IP (Manual) instead of re-detecting
+    const ip = SERVER_IP; 
+    const port = PORT;
     const urls = {
       controller: `http://${ip}:${port}/controller.html`,
       client: `http://${ip}:${port}/client.html`
@@ -316,12 +321,13 @@ setInterval(() => {
 
 // 404 Fallback
 app.use((req, res) => {
+  // UPDATED: Display the Manual IP on the 404 page
   res.status(404).send(`
     <pre style="font-family: monospace; color: white; background: #000; padding: 40px; text-align: center; font-size: 14px;">
 ╔══════════════════════════════════════════════════════════╗
   YOUTUBE SYNC SERVER ACTIVE
-  Controller: http://${getLocalIP()}:${process.env.PORT || 8000}/controller.html
-  Client:     http://${getLocalIP()}:${process.env.PORT || 8000}/client.html
+  Controller: http://${SERVER_IP}:${PORT}/controller.html
+  Client:     http://${SERVER_IP}:${PORT}/client.html
   WiFi: ${WIFI_CONFIG.ssid} | Pass: ${WIFI_CONFIG.password}
   Supports: YouTube Links
 ╚══════════════════════════════════════════════════════════╝
@@ -358,9 +364,7 @@ app.get("/health", (req, res) => {
 });
 
 // Start Server
-const PORT = process.env.PORT || 8000;
-const IP = getLocalIP();
-
-server.listen(PORT, IP, () => {
-  printBanner(IP, PORT);
+// UPDATED: Listen on SERVER_IP (which comes from config.json)
+server.listen(PORT, SERVER_IP, () => {
+  printBanner(SERVER_IP, PORT);
 });
