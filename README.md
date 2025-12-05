@@ -68,7 +68,15 @@ It features a web-based controller that generates QR codes 📱 for easy connect
     {
       "WIFI_SSID": "Your_Hotspot_Name",
       "WIFI_PASSWORD": "Your_Hotspot_Password"
+      "HOTSPOT_IP": "Your_IP"
     }
+    ```
+
+    To Find Your Hotspot IP Address
+    
+    **`Open Command Prompt & Run`**
+    ```sh
+    ipconfig
     ```
 
 ---
