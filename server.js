@@ -4,6 +4,12 @@ import { Server } from "socket.io";
 import os from "os";
 import qrcode from "qrcode";
 import fs from "fs";
+import multer from "multer";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // --- LOAD CONFIG ---
 let config;
@@ -14,9 +20,172 @@ try {
   console.error("[FATAL] Could not read config.json.", err);
   process.exit(1);
 }
-// --- END LOAD CONFIG ---
 
-// Helper: Get local IPv4 address (Auto-detect fallback)
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Load existing files from uploads directory on startup
+function loadExistingFiles() {
+  try {
+    const files = fs.readdirSync(uploadsDir);
+    let loadedCount = 0;
+    
+    files.forEach(filename => {
+      const filePath = path.join(uploadsDir, filename);
+      
+      // Skip if file doesn't exist (race condition)
+      if (!fs.existsSync(filePath)) return;
+      
+      const stats = fs.statSync(filePath);
+      
+      if (stats.isFile()) {
+        const ext = path.extname(filename).toLowerCase();
+        const videoExts = ['.mp4', '.webm', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.m4v', '.3gp'];
+        const audioExts = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'];
+        
+        let fileType = null;
+        if (videoExts.includes(ext)) {
+          fileType = 'local_video';
+        } else if (audioExts.includes(ext)) {
+          fileType = 'local_audio';
+        }
+        
+        if (fileType && !uploadedFiles.has(filename)) {
+          const fileInfo = {
+            id: filename,
+            originalName: filename,
+            url: `/uploads/${filename}`,
+            type: fileType,
+            size: stats.size,
+            uploadedAt: stats.birthtime.toISOString()
+          };
+          
+          uploadedFiles.set(filename, fileInfo);
+          loadedCount++;
+        }
+      }
+    });
+    
+    if (loadedCount > 0) {
+      console.log(`[STARTUP] Loaded ${loadedCount} existing file(s) from uploads directory`);
+    }
+  } catch (error) {
+    console.error('[ERROR] Failed to load existing files:', error);
+  }
+}
+
+// Watch uploads directory for changes
+function watchUploadsDirectory() {
+  console.log('[WATCHER] Monitoring /uploads folder for changes...');
+  
+  fs.watch(uploadsDir, (eventType, filename) => {
+    if (!filename) return;
+    
+    const filePath = path.join(uploadsDir, filename);
+    
+    // File added or modified
+    if (eventType === 'rename' || eventType === 'change') {
+      // Use setTimeout to avoid catching incomplete file writes
+      setTimeout(() => {
+        if (fs.existsSync(filePath)) {
+          const stats = fs.statSync(filePath);
+          
+          if (stats.isFile() && !uploadedFiles.has(filename)) {
+            const ext = path.extname(filename).toLowerCase();
+            const videoExts = ['.mp4', '.webm', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.m4v', '.3gp'];
+            const audioExts = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'];
+            
+            let fileType = null;
+            if (videoExts.includes(ext)) {
+              fileType = 'local_video';
+            } else if (audioExts.includes(ext)) {
+              fileType = 'local_audio';
+            }
+            
+            if (fileType) {
+              const fileInfo = {
+                id: filename,
+                originalName: filename,
+                url: `/uploads/${filename}`,
+                type: fileType,
+                size: stats.size,
+                uploadedAt: stats.birthtime.toISOString()
+              };
+              
+              uploadedFiles.set(filename, fileInfo);
+              console.log(`[WATCHER] New file detected: ${filename} (${fileType})`);
+              
+              // Notify all controllers about new file
+              io.to('controllers').emit('file_added', fileInfo);
+            }
+          }
+        } else {
+          // File deleted
+          if (uploadedFiles.has(filename)) {
+            console.log(`[WATCHER] File removed: ${filename}`);
+            uploadedFiles.delete(filename);
+            
+            // Check if deleted file is currently playing
+            if (currentMediaState.fileUrl && currentMediaState.fileUrl.includes(filename)) {
+              console.log(`[WATCHER] Currently playing file deleted, stopping playback`);
+              
+              currentMediaState = {
+                mediaType: null,
+                videoId: null,
+                fileUrl: null,
+                fileName: null,
+                time: 0,
+                isPlaying: false,
+                volume: currentMediaState.volume,
+                isMuted: currentMediaState.isMuted,
+                lastUpdate: Date.now()
+              };
+              
+              io.emit("command", { type: "stop" });
+              io.emit("current_state", currentMediaState);
+            }
+            
+            // Notify controllers about file removal
+            io.to('controllers').emit('file_removed', { filename });
+          }
+        }
+      }, 500); // Wait 500ms to ensure file write is complete
+    }
+  });
+}
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 500 * 1024 * 1024 // 500MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /mp4|mp3|webm|ogg|wav|m4a|mkv|avi|mov|flv|wmv|m4v|3gp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = file.mimetype.startsWith('video/') || file.mimetype.startsWith('audio/');
+    
+    if (mimetype || extname) {
+      return cb(null, true);
+    }
+    cb(new Error("Invalid file type. Only video and audio files are allowed."));
+  }
+});
+
+// Helper: Get local IPv4 address
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
@@ -29,8 +198,6 @@ function getLocalIP() {
   return "127.0.0.1";
 }
 
-// --- DETERMINE SERVER IP (PRIORITIZE CONFIG) ---
-// If config.HOTSPOT_IP exists, use it. Otherwise, auto-detect.
 const SERVER_IP = config.HOTSPOT_IP || getLocalIP();
 const PORT = process.env.PORT || 8000;
 
@@ -43,28 +210,33 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   },
   pingTimeout: 60000,
-  pingInterval: 25000
+  pingInterval: 25000,
+  maxHttpBufferSize: 1e8 // 100MB for large file transfers
 });
 
-// Serve static files from 'public' folder
+// Serve static files
 app.use(express.static("public"));
 app.use(express.json());
+app.use("/uploads", express.static(uploadsDir));
 
 // Track connected clients and controllers
 const clients = new Map();
 const controllers = new Map();
+const uploadedFiles = new Map(); // Track uploaded files
 
-// --- WiFi Configuration ---
+// WiFi Configuration
 const WIFI_CONFIG = {
   ssid: process.env.WIFI_SSID || config.WIFI_SSID,
   password: process.env.WIFI_PASSWORD || config.WIFI_PASSWORD,
   security: "WPA"
 };
 
-// Unified Media State (YouTube Only)
+// Unified Media State
 let currentMediaState = {
-  mediaType: "youtube",
-  videoId: null,
+  mediaType: null, // "youtube", "local_video", "local_audio"
+  videoId: null, // For YouTube
+  fileUrl: null, // For local files
+  fileName: null, // Original file name
   time: 0,
   isPlaying: false,
   volume: 100,
@@ -72,13 +244,13 @@ let currentMediaState = {
   lastUpdate: Date.now()
 };
 
-// Graceful console banner
+// Banner
 function printBanner(ip, port) {
   console.clear();
   console.log("\n");
-  console.log("═".repeat(66));
-  console.log("   YOUTUBE SYNC SERVER");
-  console.log("═".repeat(66));
+  console.log("═".repeat(70));
+  console.log("   MULTI-MEDIA SYNC SERVER");
+  console.log("═".repeat(70));
   console.log(`   Status:       Running`);
   console.log(`   Local Time:   ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`);
   console.log(`   Server IP:    ${ip} (Manual: ${!!config.HOTSPOT_IP})`);
@@ -93,8 +265,8 @@ function printBanner(ip, port) {
   console.log(`   Client URL:`);
   console.log(`   http://${ip}:${port}/client.html`);
   console.log("");
-  console.log("   Supports: YouTube Videos");
-  console.log("═".repeat(66));
+  console.log("   Supports: YouTube Videos | Local Videos | Local Audio");
+  console.log("═".repeat(70));
   console.log("   Waiting for connections...\n");
 }
 
@@ -124,8 +296,7 @@ app.get("/api/wifi-qr", async (req, res) => {
 
 app.get("/api/connection-qr", async (req, res) => {
   try {
-    // UPDATED: Use SERVER_IP (Manual) instead of re-detecting
-    const ip = SERVER_IP; 
+    const ip = SERVER_IP;
     const port = PORT;
     const urls = {
       controller: `http://${ip}:${port}/controller.html`,
@@ -146,6 +317,7 @@ app.get("/api/status", (req, res) => {
     clients: clients.size,
     controllers: controllers.size,
     currentMedia: currentMediaState,
+    uploadedFiles: uploadedFiles.size,
     uptime: process.uptime(),
     serverTime: new Date().toISOString()
   });
@@ -159,6 +331,115 @@ app.get("/api/clients", (req, res) => {
     lastSeen: c.lastSeen
   }));
   res.json({ clients: clientList, count: clients.size });
+});
+
+// File upload endpoint
+app.post("/api/upload", upload.single("file"), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileType = req.file.mimetype.startsWith("video") ? "local_video" : "local_audio";
+    
+    const fileInfo = {
+      id: req.file.filename,
+      originalName: req.file.originalname,
+      url: fileUrl,
+      type: fileType,
+      size: req.file.size,
+      uploadedAt: new Date().toISOString()
+    };
+
+    uploadedFiles.set(req.file.filename, fileInfo);
+
+    console.log(`[UPLOAD] ${fileType.toUpperCase()}: ${req.file.originalname} (${(req.file.size / 1024 / 1024).toFixed(2)}MB)`);
+
+    res.json({
+      success: true,
+      file: fileInfo
+    });
+  } catch (error) {
+    console.error("[ERROR] Upload failed:", error);
+    res.status(500).json({ error: "Upload failed" });
+  }
+});
+
+// Get list of uploaded files
+app.get("/api/files", (req, res) => {
+  const fileList = Array.from(uploadedFiles.values());
+  res.json({ files: fileList, count: fileList.length });
+});
+
+// Force re-scan uploads directory
+app.post("/api/files/rescan", (req, res) => {
+  try {
+    console.log('[RESCAN] Manually rescanning uploads directory...');
+    const beforeCount = uploadedFiles.size;
+    
+    loadExistingFiles(); // Re-run the scan
+    
+    const afterCount = uploadedFiles.size;
+    const newFiles = afterCount - beforeCount;
+    
+    console.log(`[RESCAN] Complete. Total files: ${afterCount} (${newFiles >= 0 ? '+' : ''}${newFiles} change)`);
+    
+    const fileList = Array.from(uploadedFiles.values());
+    res.json({ 
+      success: true, 
+      files: fileList, 
+      count: afterCount,
+      newFiles: newFiles
+    });
+  } catch (error) {
+    console.error('[ERROR] Rescan failed:', error);
+    res.status(500).json({ error: 'Rescan failed' });
+  }
+});
+
+// Delete uploaded file
+app.delete("/api/files/:filename", (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const filePath = path.join(uploadsDir, filename);
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      const deletedFile = uploadedFiles.get(filename);
+      uploadedFiles.delete(filename);
+      console.log(`[DELETE] File removed: ${filename}`);
+      
+      // Notify all clients if this file is currently playing
+      if (currentMediaState.fileUrl && currentMediaState.fileUrl.includes(filename)) {
+        console.log(`[DELETE] Currently playing file deleted, stopping playback on all clients`);
+        
+        // Reset media state
+        currentMediaState = {
+          mediaType: null,
+          videoId: null,
+          fileUrl: null,
+          fileName: null,
+          time: 0,
+          isPlaying: false,
+          volume: currentMediaState.volume,
+          isMuted: currentMediaState.isMuted,
+          lastUpdate: Date.now()
+        };
+        
+        // Broadcast stop command to all clients
+        io.emit("command", { type: "stop" });
+        io.emit("current_state", currentMediaState);
+      }
+      
+      res.json({ success: true, message: "File deleted" });
+    } else {
+      res.status(404).json({ error: "File not found" });
+    }
+  } catch (error) {
+    console.error("[ERROR] Delete failed:", error);
+    res.status(500).json({ error: "Delete failed" });
+  }
 });
 
 // Socket.IO Connection Handling
@@ -180,6 +461,7 @@ io.on("connection", (socket) => {
 
     if (role === "controller") {
       controllers.set(socket.id, metadata);
+      socket.join('controllers'); // Join controllers room for targeted broadcasts
       console.log(`[CONTROLLER] Registered: ${socket.id}`);
       socket.emit("current_state", currentMediaState);
     } else {
@@ -197,48 +479,80 @@ io.on("connection", (socket) => {
       return;
     }
 
-    console.log(`[COMMAND] ${data.type.toUpperCase()} | ID: ${data.videoId || 'N/A'}`);
+    console.log(`[COMMAND] ${data.type.toUpperCase()} | Type: ${data.mediaType || 'N/A'}`);
 
-    // Handle load (YouTube only)
+    // Handle load
     if (data.type === "load") {
-      let videoId = null;
+      if (data.mediaType === "youtube") {
+        let videoId = null;
 
-      if (data.url) {
-        if (data.url.includes("youtube.com") || data.url.includes("youtu.be")) {
+        if (data.url) {
           const ytMatch = data.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
           videoId = ytMatch ? ytMatch[1] : null;
           if (!videoId) {
             socket.emit("error", { message: "Invalid YouTube URL" });
             return;
           }
+        } else if (data.videoId) {
+          videoId = data.videoId;
         }
-      } else if (data.videoId) {
-        videoId = data.videoId;
-      }
-      
-      if (!videoId) {
+
+        if (!videoId) {
           socket.emit("error", { message: "Invalid YouTube URL or ID" });
           return;
+        }
+
+        currentMediaState = {
+          mediaType: "youtube",
+          videoId,
+          fileUrl: null,
+          fileName: null,
+          time: 0,
+          isPlaying: true,
+          volume: currentMediaState.volume,
+          isMuted: currentMediaState.isMuted,
+          lastUpdate: Date.now()
+        };
+
+        const broadcastData = {
+          type: "load",
+          mediaType: "youtube",
+          videoId,
+          time: 0
+        };
+        socket.broadcast.emit("command", broadcastData);
+        io.emit("current_state", currentMediaState);
+        return;
+      } 
+      else if (data.mediaType === "local_video" || data.mediaType === "local_audio") {
+        if (!data.fileUrl) {
+          socket.emit("error", { message: "File URL is required" });
+          return;
+        }
+
+        currentMediaState = {
+          mediaType: data.mediaType,
+          videoId: null,
+          fileUrl: data.fileUrl,
+          fileName: data.fileName || "Unknown",
+          time: 0,
+          isPlaying: true,
+          volume: currentMediaState.volume,
+          isMuted: currentMediaState.isMuted,
+          lastUpdate: Date.now()
+        };
+
+        const broadcastData = {
+          type: "load",
+          mediaType: data.mediaType,
+          fileUrl: data.fileUrl,
+          fileName: data.fileName,
+          time: 0
+        };
+        socket.broadcast.emit("command", broadcastData);
+        io.emit("current_state", currentMediaState);
+        return;
       }
-
-      currentMediaState = {
-        ...currentMediaState,
-        mediaType: "youtube",
-        videoId,
-        time: 0,
-        isPlaying: true,
-        lastUpdate: Date.now()
-      };
-
-      const broadcastData = {
-        type: "load",
-        mediaType: "youtube",
-        videoId,
-        time: 0
-      };
-      socket.broadcast.emit("command", broadcastData);
-      io.emit("current_state", currentMediaState); // Update all
-      return;
     }
 
     // Handle other commands
@@ -321,16 +635,15 @@ setInterval(() => {
 
 // 404 Fallback
 app.use((req, res) => {
-  // UPDATED: Display the Manual IP on the 404 page
   res.status(404).send(`
     <pre style="font-family: monospace; color: white; background: #000; padding: 40px; text-align: center; font-size: 14px;">
-╔══════════════════════════════════════════════════════════╗
-  YOUTUBE SYNC SERVER ACTIVE
+╔══════════════════════════════════════════════════════════════╗
+  MULTI-MEDIA SYNC SERVER ACTIVE
   Controller: http://${SERVER_IP}:${PORT}/controller.html
   Client:     http://${SERVER_IP}:${PORT}/client.html
   WiFi: ${WIFI_CONFIG.ssid} | Pass: ${WIFI_CONFIG.password}
-  Supports: YouTube Links
-╚══════════════════════════════════════════════════════════╝
+  Supports: YouTube | Local Video | Local Audio
+╚══════════════════════════════════════════════════════════════╝
     </pre>
   `);
 });
@@ -359,12 +672,12 @@ app.get("/health", (req, res) => {
     uptime: process.uptime(),
     clients: clients.size,
     controllers: controllers.size,
-    media: currentMediaState.videoId ? "youtube" : "none"
+    media: currentMediaState.mediaType || "none",
+    uploadedFiles: uploadedFiles.size
   });
 });
 
 // Start Server
-// UPDATED: Listen on SERVER_IP (which comes from config.json)
 server.listen(PORT, SERVER_IP, () => {
   printBanner(SERVER_IP, PORT);
 });

@@ -1,14 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>YouTube Sync Client</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Media Sync Client</title>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Video.js for better codec support -->
+  <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+  <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
     body {
       background: #000000;
@@ -23,7 +32,7 @@
 
     .container {
       width: 100%;
-      max-width: 800px;
+      max-width: 900px;
     }
 
     header h1 {
@@ -48,21 +57,117 @@
       margin-top: 32px;
     }
 
+    .media-info {
+      background: #111111;
+      border: 1px solid #222222;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .media-type {
+      font-size: 0.9rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .media-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      margin-top: 4px;
+    }
+
+    .sync-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: #0f0;
+    }
+
+    .sync-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #0f0;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
     #player-container {
       position: relative;
       width: 100%;
-      max-width: 720px;
-      margin: 28px auto 0;
+      max-width: 100%;
+      margin: 0 auto;
       border-radius: 16px;
       overflow: hidden;
       border: 1px solid #333333;
       background: #000;
     }
 
-    #player {
+    #youtube-player {
       width: 100%;
-      height: 405px;
+      height: 480px;
       background: #000;
+    }
+
+    #youtube-player.active {
+      display: block !important;
+      visibility: visible !important;
+    }
+
+    #local-player,
+    #native-player {
+      width: 100%;
+      height: 480px;
+      background: #000;
+      display: none;
+    }
+
+    #local-player.active,
+    #native-player.active {
+      display: block;
+    }
+
+    #local-audio {
+      width: 100%;
+      height: 60px;
+      display: none;
+    }
+
+    #local-audio.active {
+      display: block;
+    }
+
+    .video-js {
+      width: 100% !important;
+      height: 480px !important;
+    }
+
+    .video-js .vjs-big-play-button {
+      border-color: #fff;
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .video-js .vjs-control-bar {
+      background-color: rgba(0, 0, 0, 0.7);
     }
 
     .status {
@@ -71,15 +176,24 @@
       background: #111111;
       border-radius: 14px;
       border: 1px solid #222222;
-      font-weight: 600;
-      font-size: 1.1rem;
-      text-align: center;
-      color: #cccccc;
+      display: flex;
+      justify-content: space-around;
     }
 
-    .status span {
-      color: #ffffff;
+    .status-item {
+      text-align: center;
+    }
+
+    .status-label {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .status-value {
+      font-size: 1.3rem;
       font-weight: 700;
+      color: #fff;
     }
 
     #overlay {
@@ -115,25 +229,81 @@
       pointer-events: none;
     }
 
+    .waiting-screen {
+      display: block;
+      text-align: center;
+      padding: 60px 20px;
+      color: #888;
+    }
+
+    .waiting-screen.hidden {
+      display: none;
+    }
+
+    .waiting-screen.active {
+      display: block;
+    }
+
+    .waiting-screen h2 {
+      font-size: 1.5rem;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+
+    .waiting-screen p {
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .player-wrapper {
+      margin-top: 0;
+    }
+
+    .player-wrapper.hidden {
+      display: none;
+    }
+
     .footer {
       margin-top: 48px;
       font-size: 0.9rem;
       color: #555555;
       font-weight: 500;
+      text-align: center;
     }
 
     @media (max-width: 768px) {
-      header h1 { font-size: 2.2rem; }
-      #player { height: 56.25vw; }
-      .card { padding: 24px; }
+      header h1 {
+        font-size: 2.2rem;
+      }
+
+      #youtube-player,
+      #local-player,
+      #native-player {
+        height: 56.25vw;
+      }
+
+      .card {
+        padding: 24px;
+      }
     }
 
     @media (max-width: 480px) {
-      #player-container { border-radius: 12px; }
-      #overlay { font-size: 1.4rem; }
+      #player-container {
+        border-radius: 12px;
+      }
+
+      #overlay {
+        font-size: 1.4rem;
+      }
+
+      .media-info {
+        flex-direction: column;
+        gap: 12px;
+      }
     }
   </style>
 </head>
+
 <body>
   <div id="overlay">
     <div>Click to Enable Playback</div>
@@ -142,21 +312,47 @@
 
   <div class="container">
     <header>
-      <h1>YouTube Sync</h1>
-      <p>Real-time synchronized playback client</p>
+      <h1>Media Sync Client</h1>
+      <p>Real-time synchronized media playback</p>
     </header>
 
     <div class="card">
       <div class="status">
-        Connected Clients: <span id="count">0</span>
+        <div class="status-item">
+          <div class="status-label">Connected Clients</div>
+          <div class="status-value" id="count">0</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Connection</div>
+          <div class="status-value" style="color: #0f0;">●</div>
+        </div>
       </div>
 
-      <div id="player-container">
-        <div id="player"></div>
+      <div class="media-info" id="mediaInfo" style="display: none;">
+        <div>
+          <div class="media-type" id="mediaType">YouTube Video</div>
+          <div class="media-name" id="mediaName">No media loaded</div>
+        </div>
+        <div class="sync-indicator">
+          <div class="sync-dot"></div>
+          <span>Synced</span>
+        </div>
       </div>
 
-      <div class="footer">
-        YouTube Sync Client 
+      <div class="waiting-screen active" id="waitingScreen">
+        <h2>Waiting for Media</h2>
+        <p>Controller will load media soon...</p>
+      </div>
+
+      <div class="player-wrapper" id="playerWrapper">
+        <div id="player-container">
+          <div id="youtube-player"></div>
+          <video id="local-player" class="video-js vjs-big-play-centered" controls preload="auto" playsinline>
+            <p class="vjs-no-js">To view this video please enable JavaScript</p>
+          </video>
+          <video id="native-player" controls playsinline></video>
+          <audio id="local-audio" controls></audio>
+        </div>
       </div>
     </div>
   </div>
@@ -169,24 +365,45 @@
     let playerReady = false;
     let autoplayEnabled = false;
     let queuedCommands = [];
+    let currentMediaType = null;
+    let videoJsPlayer = null;
+    let useNativePlayer = false;
 
     const overlay = document.getElementById("overlay");
+    const waitingScreen = document.getElementById("waitingScreen");
+    const playerWrapper = document.getElementById("playerWrapper");
+    const mediaInfo = document.getElementById("mediaInfo");
+    const localPlayer = document.getElementById("local-player");
+    const nativePlayer = document.getElementById("native-player");
+    const localAudio = document.getElementById("local-audio");
+    const youtubePlayerDiv = document.getElementById("youtube-player");
+
+    // Overlay click handler
     overlay.addEventListener("click", () => {
       autoplayEnabled = true;
       overlay.classList.add("hidden");
       setTimeout(() => { overlay.style.display = "none"; }, 400);
+      console.log("[Client] Autoplay enabled");
 
+      // Execute queued commands
+      if (queuedCommands.length > 0) {
+        console.log(`[Client] Processing ${queuedCommands.length} queued commands`);
+        queuedCommands.forEach(cmd => handleCommand(cmd));
+        queuedCommands = [];
+      }
+
+      // Unmute and test player if ready
       if (player && playerReady) {
         player.unMute();
-        player.playVideo();
-        setTimeout(() => player.pauseVideo(), 100);
       }
     });
 
+    // YouTube API Ready
     function onYouTubeIframeAPIReady() {
-      player = new YT.Player("player", {
-        height: "405",
-        width: "720",
+      console.log("[Client] YouTube API loading...");
+      player = new YT.Player("youtube-player", {
+        height: "480",
+        width: "100%",
         videoId: "",
         playerVars: {
           autoplay: 0,
@@ -194,67 +411,98 @@
           rel: 0,
           modestbranding: 1,
           fs: 1,
-          iv_load_policy: 3
+          iv_load_policy: 3,
+          playsinline: 1
         },
         events: {
           onReady: onPlayerReady,
-          onStateChange: onPlayerStateChange
+          onStateChange: onPlayerStateChange,
+          onError: onPlayerError
         }
       });
     }
 
     function onPlayerReady(event) {
       playerReady = true;
-      console.log("[Client] Player initialized and ready");
-      queuedCommands.forEach(cmd => handleCommand(cmd));
-      queuedCommands = [];
+      console.log("[Client] YouTube Player ready");
+
+      // Process queued commands
+      if (queuedCommands.length > 0) {
+        queuedCommands.forEach(cmd => handleCommand(cmd));
+        queuedCommands = [];
+      }
     }
 
     function onPlayerStateChange(event) {
-      // Optional: sync state back to server if needed
+      const states = {
+        '-1': 'UNSTARTED',
+        '0': 'ENDED',
+        '1': 'PLAYING',
+        '2': 'PAUSED',
+        '3': 'BUFFERING',
+        '5': 'CUED'
+      };
+      console.log("[Client] Player state:", states[event.data] || event.data);
     }
 
+    function onPlayerError(event) {
+      console.error("[Client] Player error:", event.data);
+    }
+
+    // Socket Events
     socket.on("clients_count", (data) => {
       document.getElementById("count").textContent = data.clients;
     });
 
+    socket.on("current_state", (state) => {
+      console.log("[Client] Received current state:", state);
+      if (state.mediaType) {
+        handleCommand({
+          type: "load",
+          mediaType: state.mediaType,
+          videoId: state.videoId,
+          fileUrl: state.fileUrl,
+          fileName: state.fileName,
+          time: state.time
+        });
+      }
+    });
+
     socket.on("command", (data) => {
       console.log("[Client] Command received:", data);
-      if (!playerReady) {
-        queuedCommands.push(data);
-        return;
-      }
       handleCommand(data);
     });
 
+    // Command Handler
     function handleCommand(data) {
-      if (!autoplayEnabled) {
-        console.warn("[Client] Autoplay not enabled. Queuing command until user interaction.");
+      if (!autoplayEnabled && data.type === "load") {
+        console.log("[Client] Queuing command - autoplay not enabled");
         queuedCommands.push(data);
+        overlay.style.display = "flex";
+        overlay.classList.remove("hidden");
         return;
       }
 
       try {
         switch (data.type) {
           case "load":
-            player.loadVideoById({ videoId: data.videoId, startSeconds: data.time || 0 });
+            loadMedia(data);
             break;
           case "play":
-            player.playVideo();
+            playMedia();
             break;
           case "pause":
-            player.pauseVideo();
+            pauseMedia();
             break;
           case "seek":
-            player.seekTo(data.time || 0, true);
+            seekMedia(data.time || 0);
             break;
           case "restart":
-            player.seekTo(0, true);
-            player.playVideo();
+            seekMedia(0);
+            setTimeout(() => playMedia(), 100);
             break;
-          case "sync":
-            const current = player.getCurrentTime();
-            player.seekTo(current, true);
+          case "stop":
+            stopMedia();
             break;
         }
       } catch (err) {
@@ -262,14 +510,308 @@
       }
     }
 
-    setInterval(() => {
-      if (!autoplayEnabled && playerReady && queuedCommands.length > 0) {
-        overlay.style.display = "flex";
-        overlay.classList.remove("hidden");
-      }
-    }, 3000);
+    // Hide all players
+    // Hide all players AND fully stop/clear any HTML5/video.js sources
+    function hideAllPlayers() {
+      // Remove visible classes
+      youtubePlayerDiv.classList.remove('active');
+      localPlayer.classList.remove('active');
+      nativePlayer.classList.remove('active');
+      localAudio.classList.remove('active');
 
-    console.log("[Client] YouTube Sync Client initialized");
+      // Pause and clear native player
+      try {
+        nativePlayer.pause();
+        nativePlayer.removeAttribute('src');
+        nativePlayer.load(); // unloads the media
+        nativePlayer.currentTime = 0;
+      } catch (e) { /* ignore */ }
+
+      // Pause and clear video.js player
+      try {
+        if (videoJsPlayer) {
+          videoJsPlayer.pause();
+          // attempt to clear source
+          try { videoJsPlayer.src({ src: '', type: '' }); } catch (e) { }
+          // dispose it so it doesn't keep any event handlers or take audio focus
+          videoJsPlayer.dispose();
+          videoJsPlayer = null;
+        } else {
+          // if native <video> is used as localPlayer
+          localPlayer.pause();
+          localPlayer.removeAttribute('src');
+          localPlayer.load();
+          localPlayer.currentTime = 0;
+        }
+      } catch (e) {
+        console.warn('Error clearing videojs/native player', e);
+      }
+
+      // Pause and clear audio
+      try {
+        localAudio.pause();
+        localAudio.removeAttribute('src');
+        localAudio.load();
+        localAudio.currentTime = 0;
+      } catch (e) { /* ignore */ }
+    }
+
+    // Load Media
+    function loadMedia(data) {
+      console.log("[Client] Loading media:", data);
+      currentMediaType = data.mediaType;
+
+      hideAllPlayers();
+
+      // Always show player wrapper and hide waiting screen
+      waitingScreen.classList.add('hidden');
+      waitingScreen.classList.remove('active');
+      playerWrapper.classList.remove('hidden');
+      mediaInfo.style.display = 'flex';
+
+      const typeLabels = {
+        'youtube': 'YouTube Video',
+        'local_video': 'Local Video',
+        'local_audio': 'Local Audio'
+      };
+      document.getElementById('mediaType').textContent = typeLabels[data.mediaType] || 'Media';
+
+      if (data.mediaType === 'youtube') {
+        document.getElementById('mediaName').textContent = `Video ID: ${data.videoId}`;
+        youtubePlayerDiv.classList.add('active');
+
+        // Destroy OLD player (IMPORTANT)
+        try {
+          if (player && typeof player.destroy === "function") {
+            console.log("[Client] Destroying old YouTube player...");
+            player.destroy();
+          }
+        } catch (e) { console.warn("YT destroy error:", e); }
+
+        // Re-create a brand new YouTube player (this makes autoplay WORK)
+        console.log("[Client] Creating NEW YouTube player...");
+        player = new YT.Player("youtube-player", {
+          height: "480",
+          width: "100%",
+          videoId: data.videoId,
+          playerVars: {
+            autoplay: autoplayEnabled ? 1 : 0,
+            controls: 1,
+            playsinline: 1,
+            rel: 0,
+            modestbranding: 1
+          },
+          events: {
+            onReady: (ev) => {
+              playerReady = true;
+
+              // ensure correct time
+              if (data.time) {
+                ev.target.seekTo(data.time, true);
+              }
+
+              // force unmute + play
+              setTimeout(() => {
+                try { ev.target.unMute(); } catch { }
+                try { ev.target.playVideo(); } catch { }
+              }, 200);
+            },
+            onError: onPlayerError
+          }
+        });
+
+        return;
+      }
+
+      else if (data.mediaType === 'local_video') {
+        document.getElementById('mediaName').textContent = data.fileName || 'Local Video';
+
+        const fileExt = (data.fileName || data.fileUrl).split('.').pop().toLowerCase();
+
+        if (fileExt === 'mp4' || fileExt === 'webm') {
+          useNativePlayer = true;
+          nativePlayer.classList.add('active');
+
+          if (videoJsPlayer) {
+            try {
+              videoJsPlayer.dispose();
+              videoJsPlayer = null;
+            } catch (e) {
+              console.log('Video.js dispose error:', e);
+            }
+          }
+
+          nativePlayer.src = data.fileUrl;
+          nativePlayer.currentTime = data.time || 0;
+          nativePlayer.load();
+
+          if (autoplayEnabled) {
+            setTimeout(() => {
+              nativePlayer.play().catch(e => console.log('Autoplay prevented:', e));
+            }, 100);
+          }
+        } else {
+          useNativePlayer = false;
+          localPlayer.classList.add('active');
+
+          if (videoJsPlayer) {
+            try {
+              videoJsPlayer.dispose();
+            } catch (e) {
+              console.log('Video.js dispose error:', e);
+            }
+          }
+
+          try {
+            videoJsPlayer = videojs('local-player', {
+              controls: true,
+              autoplay: false,
+              preload: 'auto',
+              fluid: false,
+              responsive: false,
+              html5: {
+                vhs: { overrideNative: true },
+                nativeVideoTracks: false,
+                nativeAudioTracks: false,
+                nativeTextTracks: false
+              }
+            });
+
+            videoJsPlayer.src({
+              src: data.fileUrl,
+              type: detectMimeType(data.fileUrl, data.fileName)
+            });
+
+            videoJsPlayer.currentTime(data.time || 0);
+
+            if (autoplayEnabled) {
+              setTimeout(() => {
+                videoJsPlayer.play().catch(e => console.log('Autoplay prevented:', e));
+              }, 100);
+            }
+          } catch (e) {
+            console.error('Video.js initialization error:', e);
+            useNativePlayer = true;
+            localPlayer.classList.remove('active');
+            nativePlayer.classList.add('active');
+            nativePlayer.src = data.fileUrl;
+            nativePlayer.currentTime = data.time || 0;
+            nativePlayer.load();
+          }
+        }
+      }
+      else if (data.mediaType === 'local_audio') {
+        localAudio.classList.add('active');
+        document.getElementById('mediaName').textContent = data.fileName || 'Local Audio';
+
+        localAudio.src = data.fileUrl;
+        localAudio.currentTime = data.time || 0;
+        localAudio.load();
+
+        if (autoplayEnabled) {
+          localAudio.play().catch(e => console.log('Autoplay prevented:', e));
+        }
+      }
+    }
+
+    // Playback Controls
+    function playMedia() {
+      console.log("[Client] Play command for:", currentMediaType);
+      if (currentMediaType === 'youtube' && playerReady) {
+        player.playVideo();
+      } else if (currentMediaType === 'local_video') {
+        if (useNativePlayer) {
+          nativePlayer.play().catch(e => console.log('Play error:', e));
+        } else if (videoJsPlayer) {
+          videoJsPlayer.play().catch(e => console.log('Play error:', e));
+        }
+      } else if (currentMediaType === 'local_audio') {
+        localAudio.play().catch(e => console.log('Play error:', e));
+      }
+    }
+
+    function pauseMedia() {
+      console.log("[Client] Pause command for:", currentMediaType);
+      if (currentMediaType === 'youtube' && playerReady) {
+        player.pauseVideo();
+      } else if (currentMediaType === 'local_video') {
+        if (useNativePlayer) {
+          nativePlayer.pause();
+        } else if (videoJsPlayer) {
+          videoJsPlayer.pause();
+        }
+      } else if (currentMediaType === 'local_audio') {
+        localAudio.pause();
+      }
+    }
+
+    function seekMedia(time) {
+      console.log("[Client] Seek command to:", time, "for:", currentMediaType);
+      if (currentMediaType === 'youtube' && playerReady) {
+        player.seekTo(time, true);
+      } else if (currentMediaType === 'local_video') {
+        if (useNativePlayer) {
+          nativePlayer.currentTime = time;
+        } else if (videoJsPlayer) {
+          videoJsPlayer.currentTime(time);
+        }
+      } else if (currentMediaType === 'local_audio') {
+        localAudio.currentTime = time;
+      }
+    }
+
+    function stopMedia() {
+      console.log('[Client] Stopping media');
+
+      if (currentMediaType === 'youtube' && playerReady) {
+        player.stopVideo();
+      } else if (currentMediaType === 'local_video') {
+        if (useNativePlayer) {
+          nativePlayer.pause();
+          nativePlayer.src = '';
+        } else if (videoJsPlayer) {
+          videoJsPlayer.pause();
+          videoJsPlayer.src('');
+        }
+      } else if (currentMediaType === 'local_audio') {
+        localAudio.pause();
+        localAudio.src = '';
+      }
+
+      hideAllPlayers();
+      playerWrapper.classList.add('hidden');
+      mediaInfo.style.display = 'none';
+
+      setTimeout(() => {
+        waitingScreen.classList.add('active');
+      }, 100);
+
+      currentMediaType = null;
+    }
+
+    function detectMimeType(url, fileName) {
+      const ext = (fileName || url).split('.').pop().toLowerCase();
+      const mimeTypes = {
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'ogg': 'video/ogg',
+        'mkv': 'video/x-matroska',
+        'avi': 'video/x-msvideo',
+        'mov': 'video/quicktime',
+        'flv': 'video/x-flv',
+        'wmv': 'video/x-ms-wmv',
+        'm4v': 'video/x-m4v'
+      };
+      return mimeTypes[ext] || 'video/mp4';
+    }
+
+    // Heartbeat
+    setInterval(() => {
+      socket.emit('heartbeat');
+    }, 30000);
+
+    console.log("[Client] Multi-Media Sync Client initialized");
   </script>
 </body>
+
 </html>

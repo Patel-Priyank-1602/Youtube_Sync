@@ -1,18 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YouTube Sync Controller</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Media Sync Controller</title>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       background: #000;
@@ -55,7 +50,6 @@
       font-size: 1.2rem;
       margin-bottom: 12px;
       font-weight: 600;
-      color: #fff;
     }
 
     .qr-code {
@@ -86,9 +80,7 @@
       color: #aaa;
     }
 
-    .wifi-info strong {
-      color: #fff;
-    }
+    .wifi-info strong { color: #fff; }
 
     .divider {
       height: 1px;
@@ -123,7 +115,6 @@
       font-size: 2.5rem;
       font-weight: 700;
       margin-bottom: 8px;
-      color: #fff;
     }
 
     header p {
@@ -137,9 +128,47 @@
       border: 1px solid #222;
       border-radius: 16px;
       padding: 28px;
+    }
+
+    .media-tabs {
       display: flex;
-      flex-direction: column;
-      flex-grow: 1;
+      gap: 8px;
+      margin-bottom: 24px;
+      background: #111;
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid #222;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      background: transparent;
+      color: #888;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+      background: #1a1a1a;
+    }
+
+    .tab-btn.active {
+      background: #fff;
+      color: #000;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
     }
 
     .input-group {
@@ -148,7 +177,8 @@
       margin-bottom: 20px;
     }
 
-    input {
+    input[type="text"],
+    input[type="number"] {
       flex: 1;
       padding: 14px 18px;
       font-size: 1rem;
@@ -159,14 +189,41 @@
       transition: all 0.3s;
     }
 
-    input::placeholder {
-      color: #555;
-    }
+    input::placeholder { color: #555; }
 
     input:focus {
       outline: none;
       border-color: #fff;
       background: #1a1a1a;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .file-upload-btn {
+      flex: 1;
+      padding: 14px 18px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 10px;
+      color: #888;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .file-upload-btn:hover {
+      border-color: #fff;
+      background: #1a1a1a;
+      color: #fff;
+    }
+
+    .file-upload-btn.has-file {
+      color: #fff;
+      border-color: #fff;
     }
 
     button {
@@ -188,6 +245,12 @@
 
     button:active {
       transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
     }
 
     .btn-secondary {
@@ -214,9 +277,7 @@
       margin-bottom: 20px;
     }
 
-    #seekTime {
-      width: 140px;
-    }
+    #seekTime { width: 140px; }
 
     .status {
       display: flex;
@@ -241,7 +302,109 @@
     .status-value {
       font-size: 1.3rem;
       font-weight: 700;
+    }
+
+    .upload-progress {
+      display: none;
+      margin-top: 12px;
+      background: #111;
+      border-radius: 8px;
+      padding: 12px;
+      border: 1px solid #222;
+    }
+
+    .upload-progress.active {
+      display: block;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #222;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #fff;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .file-list {
+      margin-top: 16px;
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #222;
+      border-radius: 8px;
+      background: #0a0a0a;
+    }
+
+    .file-list::-webkit-scrollbar { width: 8px; }
+    .file-list::-webkit-scrollbar-track { background: transparent; }
+    .file-list::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+    .file-list-header {
+      padding: 12px 16px;
+      background: #111;
+      border-bottom: 1px solid #222;
+      font-weight: 600;
       color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .file-list-count {
+      font-size: 0.85rem;
+      color: #666;
+      font-weight: 400;
+    }
+
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: #0a0a0a;
+      border-bottom: 1px solid #222;
+      margin: 0;
+      transition: background 0.2s;
+    }
+
+    .file-item:hover {
+      background: #111;
+    }
+
+    .file-item:last-child {
+      border-bottom: none;
+    }
+
+    .file-info {
+      flex: 1;
+    }
+
+    .file-name {
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .file-meta {
+      font-size: 0.85rem;
+      color: #666;
+    }
+
+    .file-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .file-actions button {
+      padding: 8px 16px;
+      font-size: 0.85rem;
     }
 
     #log {
@@ -249,8 +412,8 @@
       border: 1px solid #222;
       border-radius: 10px;
       padding: 20px;
-      flex-grow: 1;
       min-height: 200px;
+      max-height: 300px;
       overflow-y: auto;
       font-family: 'Courier New', monospace;
       font-size: 0.85rem;
@@ -258,18 +421,9 @@
       line-height: 1.6;
     }
 
-    #log::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    #log::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    #log::-webkit-scrollbar-thumb {
-      background: #333;
-      border-radius: 4px;
-    }
+    #log::-webkit-scrollbar { width: 8px; }
+    #log::-webkit-scrollbar-track { background: transparent; }
+    #log::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
 
     .log-entry {
       padding: 4px 0;
@@ -284,15 +438,10 @@
       margin-top: 12px;
     }
 
-    .sync-all-btn:hover {
-      background: #f0f0f0;
-    }
-
     @media (max-width: 1024px) {
       .main-container {
         grid-template-columns: 1fr;
       }
-
       .left-panel {
         position: relative;
         top: 0;
@@ -300,42 +449,17 @@
     }
 
     @media (max-width: 640px) {
-      body {
-        padding: 12px;
-      }
-
-      header h1 {
-        font-size: 2rem;
-      }
-
-      .controls {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .input-group {
-        flex-direction: column;
-      }
-
-      .seek-group {
-        flex-direction: column;
-      }
-
-      #seekTime {
-        width: 100%;
-      }
-
-      .card {
-        padding: 20px;
-      }
-
-      .qr-code img {
-        width: 160px;
-        height: 160px;
-      }
+      body { padding: 12px; }
+      header h1 { font-size: 2rem; }
+      .controls { grid-template-columns: 1fr 1fr; }
+      .input-group, .seek-group { flex-direction: column; }
+      #seekTime { width: 100%; }
+      .card { padding: 20px; }
+      .qr-code img { width: 160px; height: 160px; }
+      .media-tabs { flex-direction: column; }
     }
   </style>
 </head>
-
 <body>
   <div class="main-container">
     <div class="left-panel">
@@ -370,16 +494,79 @@
 
     <div class="right-panel">
       <header>
-        <h1>YouTube Sync Controller</h1>
-        <p>Real-time synchronized playback controller</p>
+        <h1>Media Sync Controller</h1>
+        <p>Control YouTube videos, local video and audio playback</p>
       </header>
 
       <div class="card">
-        <div class="input-group">
-          <input id="videoInput" placeholder="Enter YouTube URL or Video ID" />
-          <button onclick="loadVideo()">Load Video</button>
+        <!-- Media Type Tabs -->
+        <div class="media-tabs">
+          <button class="tab-btn active" onclick="switchTab('youtube')">YouTube Video</button>
+          <button class="tab-btn" onclick="switchTab('video')">Local Video</button>
+          <button class="tab-btn" onclick="switchTab('audio')">Local Audio</button>
         </div>
 
+        <!-- YouTube Tab -->
+        <div id="youtube-tab" class="tab-content active">
+          <div class="input-group">
+            <input id="videoInput" type="text" placeholder="Enter YouTube URL or Video ID" />
+            <button onclick="loadYouTube()">Load Video</button>
+          </div>
+        </div>
+
+        <!-- Local Video Tab -->
+        <div id="video-tab" class="tab-content">
+          <div class="input-group">
+            <label class="file-upload-btn" id="videoFileLabel">
+              <span id="videoFileName">Choose Video File</span>
+              <input type="file" id="videoFile" accept="video/*" onchange="handleFileSelect(this, 'video')">
+            </label>
+            <button id="uploadVideoBtn" onclick="uploadFile('video')" disabled>Upload & Play</button>
+          </div>
+          <div id="videoUploadProgress" class="upload-progress">
+            <div style="color: #aaa; font-size: 0.9rem;">Uploading...</div>
+            <div class="progress-bar">
+              <div id="videoProgressFill" class="progress-fill"></div>
+            </div>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px 0;">
+            <div style="color: #888; font-size: 0.9rem; font-weight: 600;">Uploaded Videos</div>
+            <button onclick="refreshFiles('video')" class="btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">↻ Refresh</button>
+          </div>
+          
+          <div id="videoFileList" class="file-list">
+            <div style="text-align: center; padding: 20px; color: #666;">Loading files...</div>
+          </div>
+        </div>
+
+        <!-- Local Audio Tab -->
+        <div id="audio-tab" class="tab-content">
+          <div class="input-group">
+            <label class="file-upload-btn" id="audioFileLabel">
+              <span id="audioFileName">Choose Audio File</span>
+              <input type="file" id="audioFile" accept="audio/*" onchange="handleFileSelect(this, 'audio')">
+            </label>
+            <button id="uploadAudioBtn" onclick="uploadFile('audio')" disabled>Upload & Play</button>
+          </div>
+          <div id="audioUploadProgress" class="upload-progress">
+            <div style="color: #aaa; font-size: 0.9rem;">Uploading...</div>
+            <div class="progress-bar">
+              <div id="audioProgressFill" class="progress-fill"></div>
+            </div>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px 0;">
+            <div style="color: #888; font-size: 0.9rem; font-weight: 600;">Uploaded Audio</div>
+            <button onclick="refreshFiles('audio')" class="btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">↻ Refresh</button>
+          </div>
+          
+          <div id="audioFileList" class="file-list">
+            <div style="text-align: center; padding: 20px; color: #666;">Loading files...</div>
+          </div>
+        </div>
+
+        <!-- Playback Controls -->
         <div class="controls">
           <button class="btn-secondary" onclick="sendCommand('play')">▶ Play</button>
           <button class="btn-secondary" onclick="sendCommand('pause')">⏸ Pause</button>
@@ -417,59 +604,220 @@
     const socket = io();
     socket.emit("identify", { role: "controller" });
 
-    // Load QR codes
-    async function loadQRCodes() {
+    let currentTab = 'youtube';
+    let selectedFiles = { video: null, audio: null };
+
+    // Tab Switching
+    function switchTab(tab) {
+      currentTab = tab;
+      
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(`${tab}-tab`).classList.add('active');
+      
+      log(`Switched to ${tab.toUpperCase()} mode`);
+    }
+
+    // File Selection
+    function handleFileSelect(input, type) {
+      const file = input.files[0];
+      if (file) {
+        selectedFiles[type] = file;
+        const label = document.getElementById(`${type}FileName`);
+        label.textContent = file.name;
+        document.getElementById(`${type}FileLabel`).classList.add('has-file');
+        document.getElementById(`upload${type.charAt(0).toUpperCase() + type.slice(1)}Btn`).disabled = false;
+        log(`Selected ${type}: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+      }
+    }
+
+    // File Upload
+    async function uploadFile(type) {
+      const file = selectedFiles[type];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const progressDiv = document.getElementById(`${type}UploadProgress`);
+      const progressFill = document.getElementById(`${type}ProgressFill`);
+      
+      progressDiv.classList.add('active');
+      
       try {
-        const wifiRes = await fetch('/api/wifi-qr');
-        const wifiData = await wifiRes.json();
-        document.getElementById('wifiQR').src = wifiData.qrCode;
-        document.getElementById('wifiSSID').textContent = wifiData.ssid;
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percent = (e.loaded / e.total) * 100;
+            progressFill.style.width = percent + '%';
+          }
+        });
 
-        const connRes = await fetch('/api/connection-qr');
-        const connData = await connRes.json();
-        document.getElementById('controllerQR').src = connData.controllerQR;
-        document.getElementById('clientQR').src = connData.clientQR;
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+            log(`Upload complete: ${response.file.originalName}`);
+            
+            // Load the file immediately
+            const mediaType = type === 'video' ? 'local_video' : 'local_audio';
+            socket.emit('command', {
+              type: 'load',
+              mediaType: mediaType,
+              fileUrl: response.file.url,
+              fileName: response.file.originalName
+            });
+            
+            log(`Playing ${type}: ${response.file.originalName}`);
+            
+            // Reset
+            progressDiv.classList.remove('active');
+            progressFill.style.width = '0%';
+            selectedFiles[type] = null;
+            document.getElementById(`${type}File`).value = '';
+            document.getElementById(`${type}FileName`).textContent = `Choose ${type.charAt(0).toUpperCase() + type.slice(1)} File`;
+            document.getElementById(`${type}FileLabel`).classList.remove('has-file');
+            document.getElementById(`upload${type.charAt(0).toUpperCase() + type.slice(1)}Btn`).disabled = true;
+            
+            loadFileList(type);
+          } else {
+            throw new Error('Upload failed');
+          }
+        });
 
-        log("QR codes loaded successfully");
+        xhr.addEventListener('error', () => {
+          log(`Upload error: ${file.name}`);
+          progressDiv.classList.remove('active');
+        });
+
+        xhr.open('POST', '/api/upload');
+        xhr.send(formData);
+        
       } catch (error) {
-        log("Error loading QR codes: " + error.message);
-        console.error("QR Error:", error);
+        log(`Upload failed: ${error.message}`);
+        progressDiv.classList.remove('active');
       }
     }
 
-    socket.on("clients_count", (data) => {
-      document.getElementById("count").textContent = data.clients || 0;
-      document.getElementById("controllerCount").textContent = data.controllers || 0;
-    });
-
-    socket.on("connect", () => {
-      log("Connected to server");
-    });
-
-    socket.on("disconnect", () => {
-      log("Disconnected from server");
-    });
-
-    function log(msg) {
-      const logDiv = document.getElementById("log");
-      const entry = document.createElement("div");
-      entry.className = "log-entry";
-      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-      entry.textContent = `[${timestamp}] ${msg}`;
-      logDiv.prepend(entry);
-
-      if (logDiv.children.length > 50) {
-        logDiv.removeChild(logDiv.lastChild);
+    // Load File Lists
+    async function loadFileList(type) {
+      try {
+        const res = await fetch('/api/files');
+        const data = await res.json();
+        
+        const mediaType = type === 'video' ? 'local_video' : 'local_audio';
+        const files = data.files.filter(f => f.type === mediaType);
+        
+        const listDiv = document.getElementById(`${type}FileList`);
+        
+        if (files.length === 0) {
+          listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No files uploaded yet</div>';
+          return;
+        }
+        
+        listDiv.innerHTML = '';
+        
+        files.forEach(file => {
+          const item = document.createElement('div');
+          item.className = 'file-item';
+          item.innerHTML = `
+            <div class="file-info">
+              <div class="file-name">${file.originalName}</div>
+              <div class="file-meta">${(file.size / 1024 / 1024).toFixed(2)} MB • Uploaded ${new Date(file.uploadedAt).toLocaleString()}</div>
+            </div>
+            <div class="file-actions">
+              <button onclick="playFile('${file.url}', '${file.type}', '${file.originalName}')">▶ Play</button>
+              <button onclick="deleteFile('${file.id}', '${type}')" class="btn-secondary">🗑 Delete</button>
+            </div>
+          `;
+          listDiv.appendChild(item);
+        });
+        
+        log(`Loaded ${files.length} ${type} file(s)`);
+        
+      } catch (error) {
+        console.error('Error loading files:', error);
+        const listDiv = document.getElementById(`${type}FileList`);
+        listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #f00;">Error loading files</div>';
       }
     }
 
+    // Refresh Files - Force reload from server
+    async function refreshFiles(type) {
+      log(`Refreshing ${type} files from disk...`);
+      
+      const listDiv = document.getElementById(`${type}FileList`);
+      listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;"><div style="display: inline-block; animation: spin 1s linear infinite;">⟳</div> Scanning uploads folder...</div>';
+      
+      // Add CSS for spin animation if not exists
+      if (!document.getElementById('spin-style')) {
+        const style = document.createElement('style');
+        style.id = 'spin-style';
+        style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+      }
+      
+      try {
+        // Call rescan endpoint to force server to re-read uploads folder
+        const rescanRes = await fetch('/api/files/rescan', { method: 'POST' });
+        const rescanData = await rescanRes.json();
+        
+        if (rescanData.success) {
+          log(`Scan complete: Found ${rescanData.count} total files (${rescanData.newFiles >= 0 ? '+' : ''}${rescanData.newFiles} change)`);
+        }
+        
+        // Wait a bit to show loading animation
+        setTimeout(async () => {
+          await loadFileList(type);
+        }, 300);
+        
+      } catch (error) {
+        log(`❌ Refresh failed: ${error.message}`);
+        listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #f00;">Refresh failed</div>';
+      }
+    }
+
+    // Play File
+    function playFile(fileUrl, mediaType, fileName) {
+      socket.emit('command', {
+        type: 'load',
+        mediaType: mediaType,
+        fileUrl: fileUrl,
+        fileName: fileName
+      });
+      log(`Playing: ${fileName}`);
+    }
+
+    // Delete File
+    async function deleteFile(fileId, type) {
+      if (!confirm('Delete this file? It will stop playing on all clients if currently active.')) return;
+      
+      try {
+        const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
+        if (res.ok) {
+          const data = await res.json();
+          log(`Deleted: ${fileId}`);
+          if (data.stopped) {
+            log('⚠️ File was playing - stopped on all clients');
+          }
+          loadFileList(type);
+        } else {
+          log(`Delete failed: ${fileId}`);
+        }
+      } catch (error) {
+        log(`Delete failed: ${error.message}`);
+      }
+    }
+
+    // YouTube Functions
     function getVideoId(url) {
       const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/ ]{11})/);
-      // If no match, assume the input *is* the 11-char ID
       return match ? match[1] : (url.trim().length === 11 ? url.trim() : null);
     }
 
-    function loadVideo() {
+    function loadYouTube() {
       const input = document.getElementById("videoInput").value.trim();
       if (!input) {
         alert("Please enter a YouTube URL or video ID.");
@@ -482,11 +830,12 @@
         return;
       }
 
-      socket.emit("command", { type: "load", videoId: id, time: 0 });
-      log(`Video loaded: ${id}`);
+      socket.emit("command", { type: "load", mediaType: "youtube", videoId: id, time: 0 });
+      log(`YouTube video loaded: ${id}`);
       document.getElementById("videoInput").value = '';
     }
 
+    // Playback Commands
     function sendCommand(type) {
       socket.emit("command", { type });
       const labels = {
@@ -505,22 +854,79 @@
       }
 
       socket.emit("command", { type: "seek", time });
-      log(`Seek command sent to ${time.toFixed(2)} seconds`);
+      log(`Seek to ${time.toFixed(2)} seconds`);
       document.getElementById("seekTime").value = '';
     }
 
     function syncAll() {
-      // This command is not handled by the server logic.
-      // A full sync would require the server to re-broadcast its current state.
-      // For now, this will just log.
       socket.emit("command", { type: "sync" });
-      log("Force sync command sent (NOTE: Server does not handle 'sync' type)");
+      log("Sync command sent to all clients");
     }
 
+    // Socket Events
+    socket.on("clients_count", (data) => {
+      document.getElementById("count").textContent = data.clients || 0;
+      document.getElementById("controllerCount").textContent = data.controllers || 0;
+    });
+
+    socket.on("connect", () => log("Connected to server"));
+    socket.on("disconnect", () => log("Disconnected from server"));
+
+    // Listen for file system changes
+    socket.on("file_added", (fileInfo) => {
+      log(`New file detected: ${fileInfo.originalName}`);
+      const type = fileInfo.type === 'local_video' ? 'video' : 'audio';
+      
+      // Only reload if we're on the correct tab
+      if (currentTab === type || currentTab === 'youtube') {
+        loadFileList(type);
+      }
+    });
+
+    socket.on("file_removed", (data) => {
+      log(`File removed externally: ${data.filename}`);
+      loadFileList('video');
+      loadFileList('audio');
+    });
+
+    // Logging
+    function log(msg) {
+      const logDiv = document.getElementById("log");
+      const entry = document.createElement("div");
+      entry.className = "log-entry";
+      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+      entry.textContent = `[${timestamp}] ${msg}`;
+      logDiv.prepend(entry);
+
+      if (logDiv.children.length > 50) {
+        logDiv.removeChild(logDiv.lastChild);
+      }
+    }
+
+    // Load QR Codes
+    async function loadQRCodes() {
+      try {
+        const wifiRes = await fetch('/api/wifi-qr');
+        const wifiData = await wifiRes.json();
+        document.getElementById('wifiQR').src = wifiData.qrCode;
+        document.getElementById('wifiSSID').textContent = wifiData.ssid;
+
+        const connRes = await fetch('/api/connection-qr');
+        const connData = await connRes.json();
+        document.getElementById('controllerQR').src = connData.controllerQR;
+        document.getElementById('clientQR').src = connData.clientQR;
+
+        log("QR codes loaded successfully");
+      } catch (error) {
+        log("Error loading QR codes: " + error.message);
+      }
+    }
+
+    // Keyboard Shortcuts
     document.getElementById("videoInput").addEventListener("keypress", e => {
       if (e.key === "Enter") {
         e.preventDefault();
-        loadVideo();
+        loadYouTube();
       }
     });
 
@@ -533,8 +939,18 @@
 
     // Initialize
     loadQRCodes();
+    loadFileList('video');
+    loadFileList('audio');
     log("Controller initialized. Awaiting client connections.");
+    
+    // Refresh file lists every 30 seconds to catch any changes
+    setInterval(() => {
+      if (currentTab === 'video') {
+        loadFileList('video');
+      } else if (currentTab === 'audio') {
+        loadFileList('audio');
+      }
+    }, 30000);
   </script>
 </body>
-
 </html>
