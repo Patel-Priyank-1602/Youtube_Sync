@@ -1,6 +1,6 @@
-# 📺 Real-Time YouTube Sync Server (Local Network)
+# Real-Time Sync Media Server (YouTube + Local Video + Local Audio)
 
-This is a simple, self-hosted Node.js server designed to synchronize YouTube video playback across multiple clients on a local network 🏠. It's perfect for creating a shared viewing experience where one person can control the video (play, pause, seek, load) for everyone else, all in real-time.
+This is a simple, self-hosted Node.js server designed to synchronize YouTube video, Local Video and Local Audio playback across multiple clients on a local network 🏠. It's perfect for creating a shared viewing experience where one person can control the video (play, pause, seek, load) for everyone else, all in real-time.
 
 It features a web-based controller that generates QR codes 📱 for easy connection to your WiFi hotspot and for accessing the client/controller pages.
 
@@ -8,9 +8,10 @@ It features a web-based controller that generates QR codes 📱 for easy connect
 
 ## 🚀 Features
 
-* **Real-Time Sync:** Control multiple clients from a single controller page.
+* **YouTube Sync:** Load any YouTube video using its URL or 11-character ID.
+* **Local Video Support:** Upload your own video files from the controller device. Files automatically get hosted and synced across clients.
+* **Local Audio Support:** Upload MP3/WAV audio files and play them in sync across all clients.
 * **Core Controls:** Supports **Play** ▶️, **Pause** ⏸️, **Seek** ⏩, and **Restart** ⏮️.
-* **Load New Videos:** Easily load any YouTube video using its URL or 11-character Video ID.
 * **Easy Setup:** Uses a simple `config.json` file to manage WiFi credentials.
 * **QR Code Access:**
     * Generates a QR code for your WiFi hotspot so clients can connect easily.
@@ -45,6 +46,7 @@ It features a web-based controller that generates QR codes 📱 for easy connect
     ```
     /your-project
     ├── node_modules/
+    ├── uploads/  
     ├── public/
     │   ├── client.html      <-- The video player page 💻
     │   └── controller.html  <-- The remote control page 📱
@@ -91,27 +93,26 @@ It features a web-based controller that generates QR codes 📱 for easy connect
     A banner will appear in your console showing the server's IP address, port, and the URLs for the controller and client pages.
 
     ```
-    ══════════════════════════════════════════════════════════════════
-    YOUTUBE SYNC SERVER 
-    ══════════════════════════════════════════════════════════════════
-    Status:        Running
-    Local Time:    date/month/year, time in am/pm
-    Server IP:     10.x.x.x
-    Port:          8000
+    ══════════════════════════════════════════════════════════════════════
+      MULTI-MEDIA SYNC SERVER
+    ══════════════════════════════════════════════════════════════════════
+      Status:       Running
+      Local Time:   7/12/2025, 10:06:41 pm
+      Server IP:    10.217.79.101 (Manual: true)
+      Port:         8000
+   
+      WiFi Network: KALE KALE
+      Password:     Priyank@1602
+   
+      Controller URL:
+      http://10.217.79.101:8000/controller.html
+   
+      Client URL:
+      http://10.217.79.101:8000/client.html
 
-    WiFi Network: WIFI_SSID
-    Password:     WIFI_PASSWORD
-
-    Controller URL:
-    http://10.x.x.x:8000/controller.html
-
-    Client URL:
-    http://10.x.x.x:8000/client.html
-
-    Supports: YouTube Videos
-    ══════════════════════════════════════════════════════════════════
-    Waiting for connections...
-    ...
+      Supports: YouTube Videos | Local Videos | Local Audio
+    ══════════════════════════════════════════════════════════════════════
+      Waiting for connections...
     ```
     You should either copy the URL from your terminal or scan the QR code.
 
@@ -129,8 +130,19 @@ It features a web-based controller that generates QR codes 📱 for easy connect
 
 ## 🐛 Troubleshooting
 
-* **Clients are out of sync?**
-    If a client's video gets out of sync (often due to network lag or video buffering), you can easily force a resync.
-    1.  On the **Controller** page, type a time (in seconds) into the **Seek** box.
-    2.  Press the **Seek to Time** button.
-    3.  You may need to press it **1-2 times** to ensure all clients receive the command and catch up.
+### ❗ Clients Not Syncing?
+
+Try the following steps:
+
+1. Enter a time (in seconds) into the **Seek** box.  
+2. Press **Seek**.  
+3. Repeat the Seek command **1–2 times** if needed (helps reduce buffering lag).
+
+### ❗ Video Not Loading?
+
+Check the following:
+
+- Ensure the **server IP address** is correct.  
+- Make sure all devices are connected to the **same WiFi/hotspot**.  
+- Verify the **file format** is supported by the browser (e.g., MP4/WebM for video, MP3/WAV for audio).  
+
