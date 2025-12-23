@@ -69,7 +69,7 @@ It features a web-based controller that generates QR codes 📱 for easy connect
     ```json
     {
       "WIFI_SSID": "Your_Hotspot_Name",
-      "WIFI_PASSWORD": "Your_Hotspot_Password"
+      "WIFI_PASSWORD": "Your_Hotspot_Password",
       "HOTSPOT_IP": "Your_IP"
     }
     ```
@@ -98,17 +98,17 @@ It features a web-based controller that generates QR codes 📱 for easy connect
     ══════════════════════════════════════════════════════════════════════
       Status:       Running
       Local Time:   7/12/2025, 10:06:41 pm
-      Server IP:    10.217.79.101 (Manual: true)
+      Server IP:    0.0.0.0 (Manual: true)
       Port:         8000
    
       WiFi Network: KALE KALE
       Password:     Priyank@1602
    
       Controller URL:
-      http://10.217.79.101:8000/controller.html
+      http://0.0.0.0:8000/controller.html
    
       Client URL:
-      http://10.217.79.101:8000/client.html
+      http://0.0.0.0:8000/client.html
 
       Supports: YouTube Videos | Local Videos | Local Audio
     ══════════════════════════════════════════════════════════════════════
